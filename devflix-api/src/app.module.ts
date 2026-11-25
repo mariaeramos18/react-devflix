@@ -1,8 +1,26 @@
-import { Module } from "@nestjs/common";
-import { PrismaModule } from "./prisma/prisma.module.js";
-import { CoursesModule } from "./courses/courses.module.js";
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+
+import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
+
+import { PrismaModule } from './prisma/prisma.module.js';
+import { HealthModule } from './health/health.module.js';
+import { CoursesModule } from './courses/courses.module.js';
+
+import { CategoriesModule } from './categories/categories.module.js'; 
 
 @Module({
-  imports: [PrismaModule, CoursesModule],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    PrismaModule,
+    HealthModule,
+    CoursesModule, 
+    CategoriesModule, // Mantenha se já criou
+  ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

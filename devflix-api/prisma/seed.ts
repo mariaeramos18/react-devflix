@@ -1,44 +1,117 @@
-import { PrismaClient } from "@prisma/client";
+import 'dotenv/config';
 
-const prisma = new PrismaClient();
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../src/generated/prisma/client.js';
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error('DATABASE_URL não configurada');
+}
+
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  console.log('Iniciando seed do DevFlix...');
+
+  // 1. Criar ou atualizar categorias
   const frontend = await prisma.category.upsert({
-    where: { slug: "frontend" },
-    update: {},
-    create: { slug: "frontend", title: "Desenvolvimento Frontend" },
+    where: { slug: 'frontend' },
+    update: { name: 'Desenvolvimento Frontend' },
+    create: { name: 'Desenvolvimento Frontend', slug: 'frontend' },
   });
 
   const backend = await prisma.category.upsert({
-    where: { slug: "backend" },
-    update: {},
-    create: { slug: "backend", title: "Desenvolvimento Backend" },
+    where: { slug: 'backend' },
+    update: { name: 'Desenvolvimento Backend' },
+    create: { name: 'Desenvolvimento Backend', slug: 'backend' },
   });
 
   const database = await prisma.category.upsert({
-    where: { slug: "database" },
-    update: {},
-    create: { slug: "database", title: "Banco de Dados" },
+    where: { slug: 'banco-de-dados' },
+    update: { name: 'Banco de Dados' },
+    create: { name: 'Banco de Dados', slug: 'banco-de-dados' },
   });
 
-  await prisma.course.createMany({
-    data: [
-      { title: "Introdução ao React", description: "Conheça os fundamentos do React.", videoId: "Tn6-PIqc4UM", categoryId: frontend.id },
-      { title: "JavaScript Moderno", description: "Aprenda conceitos de JavaScript.", videoId: "W6NZfCO5SIk", categoryId: frontend.id },
-      { title: "Node.js para Iniciantes", description: "Introdução ao ambiente Node.js.", videoId: "TlB_eWDSMt4", categoryId: backend.id },
-      { title: "APIs com Node.js", description: "Conheça o desenvolvimento de APIs.", videoId: "Oe421EPjeBE", categoryId: backend.id },
-      { title: "Introdução ao SQL", description: "Aprenda os fundamentos da linguagem SQL.", videoId: "zsjvFFKOm3c", categoryId: database.id },
-      { title: "PostgreSQL na prática", description: "Instalação, modelagem e consultas.", videoId: "SpfIwlAYaKk", categoryId: database.id },
-      { title: "MongoDB para iniciantes", description: "Banco NoSQL orientado a documentos.", videoId: "ofme2o29ngU", categoryId: database.id },
-    ],
-    skipDuplicates: true,
+  // 2. Criar ou atualizar cursos
+  const react = await prisma.course.upsert({
+    where: { slug: 'react-iniciantes' },
+    update: { title: 'React para Iniciantes', description: 'Fundamentos do React.', categoryId: frontend.id, published: true },
+    create: { title: 'React para Iniciantes', slug: 'react-iniciantes', description: 'Fundamentos do React.', categoryId: frontend.id, published: true },
   });
+
+  const node = await prisma.course.upsert({
+    where: { slug: 'nodejs-iniciantes' },
+    update: { title: 'Node.js para Iniciantes', description: 'Introdução ao Node.js.', categoryId: backend.id, published: true },
+    create: { title: 'Node.js para Iniciantes', slug: 'nodejs-iniciantes', description: 'Introdução ao Node.js.', categoryId: backend.id, published: true },
+  });
+
+  const sql = await prisma.course.upsert({
+    where: { slug: 'sql-fundamentos' },
+    update: { title: 'Fundamentos de SQL', description: 'Introdução aos bancos relacionais.', categoryId: database.id, published: true },
+    create: { title: 'Fundamentos de SQL', slug: 'sql-fundamentos', description: 'Introdução aos bancos relacionais.', categoryId: database.id, published: true },
+  });
+
+  // 3. Criar ou atualizar aulas
+  const lessons = [
+    {
+      courseId: react.id,
+      title: 'Introdução ao React',
+      description: 'Primeiros conceitos de React.',
+      videoId: 'Tn6-PIqc4UM',
+      position: 1,
+    },
+    {
+      courseId: react.id,
+      title: 'Componentes e JSX',
+      description: 'Organizando interfaces em componentes.',
+      videoId: 'w7ejDZ8SWv8',
+      position: 2,
+    },
+    {
+      courseId: node.id,
+      title: 'Introdução ao Node.js',
+      description: 'Conhecendo o ambiente Node.js.',
+      videoId: 'TlB_eWDSMt4',
+      position: 1,
+    },
+    {
+      courseId: sql.id,
+      title: 'Introdução aos Bancos de Dados',
+      description: 'Conceitos básicos de SQL.',
+      videoId: 'HXV3zeQKqGY',
+      position: 1,
+    },
+  ];
+
+  for (const lesson of lessons) {
+    const { courseId, position, ...data } = lesson;
+
+    await prisma.lesson.upsert({
+      where: {
+        courseId_position: {
+          courseId,
+          position,
+        },
+      },
+      update: data,
+      create: {
+        ...data,
+        courseId,
+        position,
+      },
+    });
+  }
+
+  console.log('Seed finalizado com sucesso!');
 }
 
 main()
-  .then(() => prisma.$disconnect())
-  .catch((e) => {
-    console.error(e);
-    prisma.$disconnect();
-    process.exit(1);
+  .catch((error) => {
+    console.error('Erro ao executar seed:', error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
   });
