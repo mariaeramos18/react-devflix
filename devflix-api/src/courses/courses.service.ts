@@ -1,25 +1,51 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service.js";
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
 export class CoursesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
-  async findAllCategoriesWithCourses() {
-    const categories = await this.prisma.category.findMany({
-      include: { courses: { orderBy: { id: "asc" } } },
-      orderBy: { createdAt: "asc" },
+  async findAll() {
+    return this.prisma.course.findMany({
+      include: {
+        category: true,
+        lessons: {
+          orderBy: {
+            position: 'asc',
+          },
+        },
+      },
+      orderBy: {
+        title: 'asc',
+      },
+    });
+  }
+
+  async findOne(id: number) {
+    const course = await this.prisma.course.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        lessons: {
+          orderBy: {
+            position: 'asc',
+          },
+        },
+      },
     });
 
-    return categories.map((category) => ({
-      id: category.slug,
-      title: category.title,
-      courses: category.courses.map((course) => ({
-        id: course.id,
-        title: course.title,
-        description: course.description,
-        videoId: course.videoId,
-      })),
-    }));
+    if (!course) {
+      throw new NotFoundException(
+        'Curso não encontrado',
+      );
+    }
+
+    return course;
   }
 }
